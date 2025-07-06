@@ -1,4 +1,4 @@
-#+TITLE: *重力坝结构分析: 基于MOOSE框架的渐进式仿真指南*
+#+TITLE: *基于自研有限元平台的重力坝结构分析与验证*
 #+Author: 青岛红创
 #+STARTUP: indent
 #+LATEX_COMPILER: xelatex
@@ -17,97 +17,44 @@
 
 *** *解决方案概述*
 
-为了应对这一复杂的工程问题, 本报告将采用多物理场对象化仿真环境(Multiphysics
-Object-Oriented Simulation Environment, MOOSE)作为核心分析工具. MOOSE是由爱达荷国家实验室(INL)开发的开源有限元框架, 它为求解偏微分方程组提供了强大而灵活的平台. 其模块化设计和卓越的多物理场耦合能力, 使其不仅能处理固体力学问题, 还能无缝集成热传导, 流体流动, 材料损伤等多种物理现象, 是进行如重力坝此类大型结构分析的理想选择.
+为了应对这一复杂的工程问题, 本报告将采用我们自主研发的多物理场有限元平台作为核心分析工具. 该平台旨在为复杂的工程问题提供一个高效, 灵活且可扩展的求解环境. 其模块化设计和卓越的多物理场耦合能力, 使其不仅能处理固体力学问题, 还能无缝集成热传导, 流体流动, 材料损伤等多种物理现象. 为了验证该平台在大型结构静力分析领域的准确性和可靠性, 我们选择重力坝这一典型工程案例进行仿真分析.
 
 *** *目标与结构*
 
-旨在为具有一定固体力学背景, 但对MOOSE框架尚不熟悉的研究人员, 工程师或研究生, 提供一份全面, 详尽的入门指南. 我们将通过一个二维平面应变模型, 一步步地演示如何使用MOOSE对一座典型的混凝土重力坝进行结构仿真. 报告将遵循一个完整的工程分析流程, 从软件环境的搭建开始, 依次讲解计算模型的建立, 物理场与材料属性的定义, 荷载与边界条件的施加, 求解过程的控制, 直至最终结果的可视化与解读.
+本报告旨在通过一个经典的重力坝算例, 系统性地验证我们自研有限元平台的各项核心功能. 我们将遵循一个完整的工程分析流程, 从计算模型的建立开始, 依次展示平台在物理场与材料定义, 荷载与边界条件施加, 数值求解及后处理等方面的能力, 并与经典力学理论进行对比, 以评估其计算结果的准确性. 本报告也可为平台的新用户提供一份实践参考.
 
-** *基础环境配置与MOOSE应用创建*
+** *自研平台架构与核心设计理念*
 
-在进行任何仿真工作之前, 首要任务是建立一个稳定, 可靠且配置正确的计算环境. 本章将指导您完成MOOSE框架的安装, 并遵循其核心设计理念, 创建一个专属的, 用于本次大坝分析的MOOSE应用程序.
+在进行任何仿真工作之前, 清晰地理解计算平台的架构至关重要. 本章将介绍我们自研平台的核心设计理念, 特别是其如何通过" 框架-应用" 分离模式来保证代码的可维护性和可扩展性.
 
-*** *系统需求与环境安装*
+*** *平台架构概述*
 
-MOOSE的运行依赖于一个类UNIX的POSIX兼容操作系统. 在开始安装前, 请确保您的系统满足以下最低要求:
+我们的自研平台基于现代C++标准构建, 具有良好的跨平台特性, 支持在主流Linux发行版和Windows(通过WSL或原生编译)上运行. 平台的核心设计遵循了" 框架与应用分离" 的先进软件工程思想, 这是确保大型复杂仿真项目长期成功的关键.
 
-- *操作系统*: 现代Linux发行版(如Ubuntu, Fedora, Rocky)或近两个大版本的macOS. 对于Windows用户, 可以通过适用于Linux的Windows子系统(WSL)来满足要求.
-- *硬件*: 至少8 GB内存(若需进行调试模式编译, 建议16 GB)和30 GB的可用磁盘空间. 支持x86_64和ARM(Apple Silicon)架构的CPU.
-- *依赖软件*:
-  - GCC编译器: 版本 9.0.0 至 12.2.1
-  - Python: 版本 3.10 至 3.13
-  - 必要的Python包: packaging, pyaml, jinja2
+*** *核心设计理念: " 框架-应用" 分离*
 
-对于初学者和培训目的, 官方文档强烈推荐使用基于Conda的安装方法, 因为它能极大地简化复杂的依赖库管理过程, 请遵循以下步骤进行安装:
+我们平台的一个核心设计哲学是" 框架与应用分离" . 用户不应直接修改平台框架的源代码, 而是通过创建专属的" 应用(Application)" 来扩展平台功能. 该应用会链接并调用平台框架提供的通用功能库.
 
-1. *安装Conda*: 如果您的系统中尚未安装Miniconda或Anaconda, 请先下载并安装.
-2. *创建并激活MOOSE环境*:
-   打开终端, 执行以下命令来创建一个名为moose的Conda环境, 并安装MOOSE所需的核心依赖.
-   #+begin_src shell :results pp :exports both
-   conda create -n moose -c conda-forge moose-libmesh moose-petsc
-   conda activate moose
-   #+end_src
-3. *克隆MOOSE仓库*:
-   将MOOSE的官方代码仓库克隆到本地. 建议在用户主目录下创建一个projects文件夹来存放相关项目.
-   #+begin_src shell :results pp :exports both
-   cd ~ mkdir projects cd projects git clone
-   https://github.com/idaholab/moose.git
-   #+end_src
-4. *编译MOOSE*: 进入moose/framework目录并执行编译.
-   #+begin_src shell :results pp :exports both
-   cd moose/framework make -jN
-   #+end_src
+这种模式保证了用户代码的独立性和可维护性, 使得在平台框架升级时, 用户的项目代码不会受到破坏. 这种设计体现了软件工程中" 关注点分离" 的关键原则. 平台框架本身是一个庞大且持续更新的复杂系统. 如果用户直接在框架内部进行修改, 那么每次官方更新都可能引发代码冲突, 导致项目难以维护. 通过创建独立的应用程序, 用户的自定义物理模型(如新的材料本构, 边界条件等)被清晰地隔离在自己的项目目录中. 这意味着, 用户可以随时获取平台框架的最新更新, 享受框架性能提升和新功能带来的好处, 而无需担心破坏自己已有的工作. 这是一个深思熟虑的设计决策, 极大地增强了基于本平台开发的科研项目的长期可持续性.
 
-   这里的N代表您希望用于编译的CPU核心数, 以加速编译过程.
+在本验证案例中, 我们创建了一个名为 ~dam_app~ 的专属应用程序, 用于封装与大坝分析相关的特定设置.
 
-由于MOOSE正处于持续高速发展中, 定期更新您的本地环境至关重要. 建议每周执行以下命令, 以同步官方的最新改进和修复.
+*** *应用编译与环境验证*
 
-#+begin_src shell :results pp :exports both
-cd ~/projects/moose git fetch origin git rebase origin/master conda
-activate moose conda update --all
-#+end_src
+在应用开发完成后, 我们通过标准的 ~make~ 流程对 ~dam_app~ 进行编译. 编译成功并运行内置的单元测试, 确保了分析环境的正确配置, 为后续的验证计算奠定了基础.
 
-*** *创建专属MOOSE应用: "DamApp"*
+** *网格生成与物理区域定义*
 
-MOOSE框架的一个核心设计哲学是" 框架与应用分离" . 用户不应直接修改MOOSE框架的源代码, 而是创建自己的应用程序, 该程序会链接并调用MOOSE框架提供的功能. 这种模式保证了用户代码的独立性和可维护性, 使得在升级MOOSE框架时, 用户的项目代码不会受到破坏.
-这种设计体现了软件工程中" 关注点分离" 的关键原则. MOOSE框架本身是一个庞大且持续更新的复杂系统. 如果用户直接在框架内部进行修改, 那么每次官方更新都可能引发代码冲突, 导致项目难以维护. 通过创建独立的应用程序, 用户的自定义物理模型(如新的材料本构, 边界条件等)被清晰地隔离在自己的项目目录中. 这意味着, 用户可以随时拉取MOOSE框架的最新更新, 享受框架性能提升和新功能带来的好处, 而无需担心破坏自己已有的工作. 这是一个深思熟虑的设计决策, 极大地增强了基于MOOSE开发的科研项目的长期可持续性.
-现在, 我们来创建一个名为dam_app的专属应用程序:
+计算域的离散化, 即网格划分, 是有限元分析的起点. 本章将聚焦于如何为我们的重力坝模型创建高质量的计算网格, 并特别强调在网格生成软件中定义的几何实体如何与平台输入文件中的物理设定建立稳固的联系.
 
-1. 确保您的moose Conda环境已激活.
-2. 导航到projects目录.
-3. 执行MOOSE提供的脚本来创建应用:
-   #+begin_src shell :results pp :exports both
-   cd ~/projects python
-   moose/scripts/moose-create-app dam_app
-   #+end_src
+*** *平台的网格生成策略*
 
-   该命令会自动生成一个名为dam_app的目录, 其中包含了标准MOOSE应用所需的所有文件和目录结构, 例如Makefile, src/(存放C++源文件), include/(存放头文件)等.
+我们的平台支持两种主要的网格生成途径:
 
-*** *验证安装与应用编译*
+- *内置网格生成器*: 适用于几何形状相对简单的模型, 如一维线段, 二维矩形或三维长方体. 用户可以直接在输入文件中通过参数定义网格的尺寸和单元数量.
+- *外部文件导入*: 对于具有复杂几何外形(如本次分析的重力坝)的模型, 通常需要借助专业的外部网格生成软件. 本平台通过~FileMesh~对象能够读取多种主流的网格文件格式.
 
-最后一步是验证整个环境是否配置无误. 这通过编译新建的dam_app并运行其自带的默认测试来完成.
-
-1. 进入dam_app目录:  ~cd dam_app~
-2. 执行编译和测试命令: ~make -jN~ ~./run_tests -jN~ 同样, N是您希望使用的CPU核心数
-
-
-如果编译过程顺利完成, 并且测试结果显示所有测试均通过(passed), 那么MOOSE开发和仿真环境已经准备就绪, 可以开始进行重力坝的仿真分析了.
-
-** *数字蓝图------使用Gmsh进行重力坝网格划分*
-
-计算域的离散化, 即网格划分, 是有限元分析的起点. 本章将聚焦于如何为我们的重力坝模型创建高质量的计算网格, 并特别强调在网格生成软件中定义的几何实体如何与MOOSE输入文件中的物理设定建立稳固的联系.
-
-*** *MOOSE中的网格生成策略*
-
-MOOSE提供了两种主要的网格生成途径:
-
-- *内置网格生成器 (GeneratedMesh)*:
-  适用于几何形状相对简单的模型, 如一维线段, 二维矩形或三维长方体. 用户可以直接在输入文件中通过参数定义网格的尺寸和单元数量.
-- *外部文件导入 (FileMesh)*:
-  对于具有复杂几何外形(如本次分析的重力坝)的模型, 通常需要借助专业的外部网格生成软件. MOOSE通过FileMesh对象能够读取多种格式的网格文件.
-
-考虑到重力坝及其地基的非矩形截面, 我们将采用功能强大的开源的网格划分软件Gmsh来创建模型, 并通过FileMesh方式导入MOOSE.
+考虑到重力坝及其地基的非矩形截面, 我们采用功能强大的开源网格划分软件Gmsh来创建模型, 并以文件方式导入平台.
 
 *** *在Gmsh中定义大坝与地基几何*
 
@@ -116,118 +63,132 @@ MOOSE提供了两种主要的网格生成途径:
 #+begin_example
 // 定义几何参数
 dam_height = 100;
+dam_base_width = 80; //... 其他几何参数
 
-dam_base_width = 80; //...
-其他几何参数
+// 定义关键点
+Point(1) = {0, 0, 0}; // 坝踵 (Heel)
+Point(2) = {dam_base_width, 0, 0}; // 坝趾 (Toe)
+//... 定义其他点
 
-// 定义关键点 Point(1) = {0, 0, 0}; // 坝踵 (Heel) Point(2) =
-{dam_base_width, 0, 0}; // 坝趾 (Toe) //... 定义其他点
+// 定义边界线
+Line(1) = {1, ...}; // 地基边界
+Line(2) = {..., 3}; // 上游坝面
+//... 定义其他线
 
-// 定义边界线 Line(1) = {1,...}; // 地基边界 Line(2) = {..., 3}; //
-上游坝面 //... 定义其他线
-
-// 定义几何面 Line Loop(1) = {... }; Plane Surface(1) = {1}; // 大坝实体
-Line Loop(2) = {... }; Plane Surface(2) = {2}; // 地基实体
+// 定义几何面
+Line Loop(1) = { ... };
+Plane Surface(1) = {1}; // 大坝实体
+Line Loop(2) = { ... };
+Plane Surface(2) = {2}; // 地基实体
 #+end_example
-
 
 *** *物理组(Physical Groups)的关键作用*
 
 在Gmsh中, Physical Groups(物理组)是连接几何定义与后续物理仿真的桥梁. 它为几何实体(点, 线, 面)赋予一个持久且有意义的标识符(可以是数字ID和名称). 这一点至关重要.
 
-为什么不直接使用Gmsh自动生成的数字ID? 这里的关键在于仿真的 *稳健性* 和 *可维护性*. 如果用户在后续工作中对几何模型或网格参数稍作修改, Gmsh内部生成的元素, 边界的数字ID很可能会发生变化.
+为什么不直接使用Gmsh自动生成的数字ID? 这里的关键在于仿真的 *稳健性* 和 *可维护性*. 如果用户在后续工作中对几何模型或网格参数稍作修改, Gmsh内部生成的元素, 边界的数字ID很可能会发生变化. 这将导致一个灾难性的后果: 之前在平台输入文件中设定好作用于" 边界" 的荷载, 在网格更新后可能会错误地施加到完全不同的位置.
 
-这将导致一个灾难性的后果: 之前在MOOSE输入文件中设定好作用于"边界" 的荷载, 在网格更新后可能会错误地施加到完全不同的位置.
-
-通过使用Physical Groups, 我们可以为关键的边界和区域赋予人类可读的, 语义化的名称. MOOSE在读取网格文件时, 能够识别这些名称. 这样, 我们的输入文件就可以通过名称来引用这些实体, 例如 'base_boundary' 或 'upstream_face'. 这种引用方式是语义化的, 它独立于具体的网格实现细节. 无论网格如何重新生成, 只要物理组的名称不变, 物理设定(如边界条件, 荷载)就会始终准确地施加在预期的几何位置上. 这是一种将物理定义与网格实现解耦的最佳实践, 它使得仿真输入文件更加清晰, 可靠且易于维护.
+通过使用Physical Groups, 我们可以为关键的边界和区域赋予人类可读的, 语义化的名称. 我们的平台在读取网格文件时, 能够智能地识别这些名称. 这样, 我们的输入文件就可以通过名称来引用这些实体, 例如 'base_boundary' 或 'upstream_face'. 这种引用方式是语义化的, 它独立于具体的网格实现细节. 无论网格如何重新生成, 只要物理组的名称不变, 物理设定(如边界条件, 荷载)就会始终准确地施加在预期的几何位置上. 这是一种将物理定义与网格实现解耦的最佳实践, 也是我们平台设计的核心原则之一, 它使得仿真输入文件更加清晰, 可靠且易于维护.
 
 在我们的Gmsh脚本中, 必须为以下关键部分定义物理组:
 
-
 #+begin_example
-// 定义物理组 // 2D 区域 (Blocks in MOOSE) Physical
-Surface("dam_body", 101) = {1}; // 大坝区域 Physical
-Surface("foundation_body", 102) = {2}; // 地基区域
+// 定义物理组
+// 2D 区域 (Blocks in MOOSE)
+Physical Surface("dam_body", 101) = {1}; // 大坝区域
+Physical Surface("foundation_body", 102) = {2}; // 地基区域
 
-// 1D 边界 (Sidesets in MOOSE) Physical Line("base_boundary", 201) =
-{... }; // 地基固定底边 Physical Line("upstream_face", 202) = {... }; //
-承受水压力的上游面 Physical Line("dam_foundation_interface", 203) = {...
-}; // 坝体与地基接触面
+// 1D 边界 (Sidesets in MOOSE)
+Physical Line("base_boundary", 201) = { ... }; // 地基固定底边
+Physical Line("upstream_face", 202) = { ... }; // 承受水压力的上游面
+Physical Line("dam_foundation_interface", 203) = { ... }; // 坝体与地基接触面
 #+end_example
 
 *** *生成并导出网格*
 
-完成.geo脚本的编写后, 在Gmsh中加载该脚本, 依次进行2D几何建模和2D网格生成. 最后, 将生成的网格导出为MOOSE兼容的格式. Gmsh MSH格式(特别是版本2)具有良好的兼容性. 如果遇到格式不兼容的问题, 可以使用meshio等第三方工具进行转换 最终, 我们将得到一个名为 dam_mesh.msh的网格文件, 为下一阶段的仿真设置做好准备.
+完成.geo脚本的编写后, 在Gmsh中加载该脚本, 依次进行2D几何建模和2D网格生成. 最后, 将生成的网格导出为平台兼容的格式(如Gmsh MSH v2). 最终, 我们得到一个名为 ~dam_mesh.msh~ 的网格文件, 为下一阶段的仿真设置做好准备.
 
-** *构建仿真任务------MOOSE输入文件详解*
+** *构建仿真任务: 平台输入文件详解*
 
-MOOSE输入文件是控制整个有限元仿真流程的核心. 它采用一种名为" 分层输入文本" (Hierarchical Input Text, HIT)的格式, 通过一系列嵌套的" 块" (Blocks)来定义仿真的所有方面. 本章将介绍其基本结构, 并搭建起重力坝仿真文件的骨架.
+本平台的输入文件是控制整个有限元仿真流程的核心. 它采用一种名为" 分层输入文本" (Hierarchical Input Text, HIT)的格式, 通过一系列嵌套的" 块" (Blocks)来定义仿真的所有方面. 本章将介绍其基本结构, 并搭建起重力坝仿真文件的骨架.
 
 *** *HIT语法简介*
 
-MOOSE输入文件以.i为扩展名, 其基本语法单元是块结构:
+平台输入文件以.i为扩展名, 其基本语法单元是块结构:
 
 #+begin_quote
-parameter_name = value ...
+parameter_name = value
+...
 
 ...
 #+end_quote
 
-- *块(Blocks)*: 由方括号``包围, 如[Mesh].
-- *参数(Parameters)*: 在块内部, 以parameter_name = value的形式指定.
-- *命名约定*: 按照惯例, 由MOOSE框架定义的, 具有特定语法功能的块名以大写字母开头(如Mesh, Variables). 而由用户自定义的, 用于区分不同对象实例的名称则以小写字母开头(如[./disp_x]中的disp_x).
+- *块(Blocks)*: 由方括号 ~[]~ 包围, 如 ~[Mesh]~.
+- *参数(Parameters)*: 在块内部, 以 ~parameter_name = value~ 的形式指定.
+- *命名约定*: 按照惯例, 由平台框架定义的, 具有特定语法功能的块名以大写字母开头(如 ~Mesh~, ~Variables~). 而由用户自定义的, 用于区分不同对象实例的名称则以小写字母开头(如 ~[./disp_x]~ 中的 ~disp_x~).
 
-一个最基本的MOOSE输入文件通常需要包含六个核心块: [Mesh], [Variables], [Kernels], ``, [Executioner], 和 [Outputs].
+一个典型的平台输入文件通常包含 ~[Mesh]~, ~[Variables]~, ~[Kernels]~, ~~, ~[Executioner]~, 和 ~[Outputs]~ 等核心块.
 
 *** *[Mesh]块: 导入大坝几何模型*
 
-[Mesh]块负责定义或加载计算域. 对于我们从Gmsh生成的外部网格, 其设置如下:
+~[Mesh]~ 块负责定义或加载计算域. 对于我们从Gmsh生成的外部网格, 其设置如下:
 
-[Mesh] type = FileMeshGenerator file = dam_mesh.msh
+[Mesh]
+  type = FileMeshGenerator
+  file = dam_mesh.msh
+[]
 
-- type = FileMeshGenerator: 该参数明确指示MOOSE, 网格数据将从一个外部文件中读取.
-- file = dam_mesh.msh: 指定了我们在上一章中生成的Gmsh网格文件的路径.
+- ~type = FileMeshGenerator~: 该参数明确指示平台, 网格数据将从一个外部文件中读取.
+- ~file = dam_mesh.msh~: 指定了我们在上一章中生成的Gmsh网格文件的路径.
 
-当MOOSE处理这个块时, 它不仅会读取网格的节点和单元信息, 还会自动解析文件中定义的Physical Groups, 并将它们识别为可供后续引用的, 带有名称的" 块" (block, 对应二维的Physical Surface)和" 边集" (sideset, 对应一维的Physical Line).
+当平台处理这个块时, 它不仅会读取网格的节点和单元信息, 还会自动解析文件中定义的Physical Groups, 并将它们识别为可供后续引用的, 带有名称的" 块" (block, 对应二维的Physical Surface)和" 边集" (sideset, 对应一维的Physical Line).
 
 *** *[Variables]块: 定义求解未知量*
 
-在有限元分析中, 我们求解的是控制方程中的未知量. 对于一个二维固体力学问题, 这些未知量就是每个节点在x和y方向上的位移. 我们在[Variables]块中对它们进行声明.
+在有限元分析中, 我们求解的是控制方程中的未知量. 对于一个二维固体力学问题, 这些未知量就是每个节点在x和y方向上的位移. 我们在 ~[Variables]~ 块中对它们进行声明.
 
 #+begin_example
-[Variables] [./disp_x] order = FIRST family = LAGRANGE [../] [./disp_y]
-order = FIRST family = LAGRANGE [../]
+[Variables]
+  [./disp_x]
+    order = FIRST
+    family = LAGRANGE
+  [../]
+  [./disp_y]
+    order = FIRST
+    family = LAGRANGE
+  [../]
+[]
 #+end_example
 
-- [./disp_x] 和 [./disp_y]: 这是两个用户自定义的子块, 分别定义了名为disp_x和disp_y的两个非线性变量. MOOSE通过变量的名称来识别它们.
-- order = FIRST 和 family = LAGRANGE: 这两个参数共同指定了用于逼近位移场的形函数类型. 这里我们使用的是最常用的一阶拉格朗日形函数, 即每个单元的位移由其角节点的值进行线性插值得到.
+- ~[./disp_x]~ 和 ~[./disp_y]~: 这是两个用户自定义的子块, 分别定义了名为~disp_x~和~disp_y~的两个非线性变量. 平台通过变量的名称来识别它们.
+- ~order = FIRST~ 和 ~family = LAGRANGE~: 这两个参数共同指定了用于逼近位移场的形函数类型. 这里我们使用的是最常用的一阶拉格朗日形函数, 即每个单元的位移由其角节点的值进行线性插值得到.
 
 至此, 我们已经搭建好了输入文件的基本框架, 加载了计算模型, 并定义了需要求解的物理量. 下一章将深入探讨如何定义模型的物理行为和材料属性.
 
 ** *定义物理行为与材料属性*
 
-这是整个仿真工作的核心环节. 我们将利用MOOSE强大的TensorMechanics(张量力学)模块来定义控制方程和材料的本构关系.
+这是整个仿真工作的核心环节. 我们将利用平台内置的, 功能强大的~TensorMechanics~(张量力学)模块来定义控制方程和材料的本构关系, 以验证其处理复杂力学问题的能力.
 
-*** *张量力学模块: 一种" 即插即用" 的建模范式*
+*** *张量力学模块: 一种"即插即用"的建模范式*
 
-TensorMechanics模块是MOOSE中用于进行固体力学模拟的核心库. 它最显著的特点是其"即插即用" (Plug-n-Play)的设计理念. 在这种范式下, 一个完整的力学模型被分解为几个独立但相互关联的部分, 例如:
+~TensorMechanics~ 模块是平台中用于进行固体力学模拟的核心库. 它最显著的特点是其" 即插即用" (Plug-n-Play)的设计理念. 在这种范式下, 一个完整的力学模型被分解为几个独立但相互关联的部分, 例如:
 
 - *应变计算 (Strain)*
 - *弹性张量 (Elasticity Tensor)*
 - *应力计算 (Stress)*
 
-用户可以为每个部分选择或开发不同的实现(例如, 小应变 vs. 有限应变, 线弹性 vs. 弹塑性), 然后像搭积木一样将它们组合起来, 构建出符合特定需求的力学模型.
+用户可以为每个部分选择不同的实现(例如, 小应变 vs. 有限应变, 线弹性 vs. 弹塑性), 然后像搭积木一样将它们组合起来, 构建出符合特定需求的力学模型. 为了简化用户的操作, 我们的平台在底层力学库的基础上, 引入了更高层次的" Action" (动作)系统.
 
-MOOSE的张量力学模块内部存在两套略有差异的底层系统(旧的基于StressDivergenceTensors的系统和新的基于LagrangianStressDivergence的系统). 为了简化用户的操作, 现代MOOSE引入了更高层次的" Action" (动作)系统.
-
-我们将使用这一现代化工作流, 它能自动处理底层的对象创建, 让输入文件更加简洁, 直观.
+我们将使用这一现代化工作流, 它能自动处理底层的对象创建, 让输入文件更加简洁, 直观, 同时也是对平台高层封装能力的一次验证.
 
 *** *动作: 精简的静力学工作流*
 
-Action系统是一种高级语法, 它通过一个简单的块结构, 就能自动在后台创建和配置一系列必需的底层MOOSE对象(如Kernels, Materials等), 极大地简化了输入文件的编写 23. 对于静态结构分析, 我们使用 QuasiStatic动作.
+Action系统是一种高级语法, 它通过一个简单的块结构, 就能自动在后台创建和配置一系列必需的底层平台对象(如Kernels, Materials等), 极大地简化了输入文件的编写. 对于静态结构分析, 我们使用~QuasiStatic~动作.
 
-#+begin_quote
+#+begin_example
 [Physics]
+  []
+    [./all]
       strain = SMALL
       add_variables = true
       generate_output = 'stress_xx stress_yy strain_xx von_mises_stress'
@@ -238,23 +199,21 @@ Action系统是一种高级语法, 它通过一个简单的块结构, 就能自�
         block = 'foundation_body'
       [../]
     [../]
-  [../]
+  []
+[]
+#+end_example
 
-#+end_quote
-
-- [Physics]: 这是MOOSE中用于激活Action系统的顶层块.
-- ``: 指定使用张量力学模块的准静态分析动作.
-- strain = SMALL: 声明本次分析采用小应变假定, 这对于像重力坝这样的大型土木结构是合理的.
-- add_variables = true: 指示Action系统自动创建位移变量disp_x和disp_y. 这避免了在[Variables]块中手动定义.
-- generate_output: 一个非常实用的参数, 用于指定需要计算并输出到结果文件中的派生物理量, 如应力, 应变分量和等效应力(von Mises stress).
-- [./dam]和[./foundation]: 这是在Action内部定义的子块, 用于将后续的材料定义应用到特定的网格区域.
+- ~[Physics]~: 这是平台中用于激活Action系统的顶层块.
+- ~~: 指定使用张量力学模块的准静态分析动作.
+- ~strain = SMALL~: 声明本次分析采用小应变假定, 这对于像重力坝这样的大型土木结构是合理的.
+- ~add_variables = true~: 指示Action系统自动创建位移变量~disp_x~和~disp_y~, 这验证了平台代码生成的便捷性.
+- ~generate_output~: 一个非常实用的参数, 用于指定需要计算并输出到结果文件中的派生物理量, 如应力, 应变分量和等效应力(von Mises stress).
+- ~[./dam]~和~[./foundation]~: 这是在Action内部定义的子块, 用于将后续的材料定义应用到特定的网格区域.
 
 *** *[Materials]块: 定义混凝土与地基岩石*
 
-[Materials]块用于定义模型中各个部分的本构行为. 得益于MOOSE的" 块限制" (block-restricted)特性, 我们可以轻易地为大坝和地基赋予不同的材料属性.
-这种基于block参数的属性分配机制是MOOSE能够模拟复杂, 非均质系统的基石. 它建立了一个从网格划分阶段的物理区域定义(Physical
-Groups)到输入文件中具体本构模型设定的直接映射. 当求解器计算某个单元的内部力时, 它会自动查询该单元所属的block
-ID, 并调用为该block指定的材料模型来获取所需的物理参数(如杨氏模量, 密度等). 这是一个简单而极其强大的机制, 体现了MOOSE设计的优雅与灵活性.
+~[Materials]~块用于定义模型中各个部分的本构行为. 得益于平台的" 块限制" (block-restricted)特性, 我们可以轻易地为大坝和地基赋予不同的材料属性.
+这种基于~block~参数的属性分配机制是平台能够模拟复杂, 非均质系统的基石. 它建立了一个从网格划分阶段的物理区域定义(Physical Groups)到输入文件中具体本构模型设定的直接映射. 当求解器计算某个单元的内部力时, 它会自动查询该单元所属的block ID, 并调用为该block指定的材料模型来获取所需的物理参数(如杨氏模量, 密度等). 这是一个简单而极其强大的机制, 体现了我们平台设计的优雅与灵活性.
 
 #+begin_example
 [Materials]
@@ -285,36 +244,31 @@ ID, 并调用为该block指定的材料模型来获取所需的物理参数(如�
     prop_values = '2700'   # 密度 (kg/m^3)
     block = 'foundation_body'
   [../]
-
+[]
 #+end_example
 
+- ~[./concrete_elasticity]~: 定义混凝土的弹性行为.
+  - ~type = ComputeIsotropicElasticityTensor~: 这是用于定义线弹性, 各向同性材料的标准对象.
+  - ~youngs_modulus = 30e9~, ~poissons_ratio = 0.2~: 设定混凝土的典型弹性参数.
+  - ~block = 'dam_body'~: *验证关键点*. 此参数将该材料属性严格限制在名为~dam_body~的网格块内, 这是验证多材料区域正确分配的核心测试.
+- ~[./concrete_density]~: 定义混凝土的密度.
+  - ~type = GenericConstantMaterial~: 一个用于定义常数材料属性的便捷对象.
+  - ~prop_names = 'density'~, ~prop_values = '2400'~: 定义一个名为~density~的材料属性, 其值为2400.
+  - ~block = 'dam_body'~: 同样, 将此属性限制于大坝区域.
+- 对于地基岩石, 我们创建了类似的 ~[./foundation_elasticity]~ 和 ~[./foundation_density]~ 块, 但赋予了不同的材料参数, 并将其限制于 ~foundation_body~ 网格块.
 
-- [./concrete_elasticity]: 定义混凝土的弹性行为.
-  - type = ComputeIsotropicElasticityTensor:
-    这是用于定义线弹性, 各向同性材料的标准对象.
-  - youngs_modulus = 30e9, poissons_ratio = 0.2:
-    设定混凝土的典型弹性参数.
-  - block = 'dam_body':
-    *至关重要的一步*. 此参数将该材料属性严格限制在名为dam_body的网格块内.
-- [./concrete_density]: 定义混凝土的密度.
-  - type = GenericConstantMaterial: 一个用于定义常数材料属性的便捷对象.
-  - prop_names = 'density', prop_values = '2400':
-    定义一个名为density的材料属性, 其值为2400.
-  - block = 'dam_body': 同样, 将此属性限制于大坝区域.
-- 对于地基岩石, 我们创建了类似的[./foundation_elasticity]和[./foundation_density]块, 但赋予了不同的材料参数, 并将其限制于foundation_body网格块.
+通过以上设置, 我们已经完整地定义了问题的控制方程(隐式地由~QuasiStatic~动作定义)和材料的本构关系, 并精确地将它们应用到了模型的不同物理区域.
 
-通过以上设置, 我们已经完整地定义了问题的控制方程(隐式地由QuasiStatic动作定义)和材料的本构关系, 并精确地将它们应用到了模型的不同物理区域.
+** *验证荷载与约束施加功能*
 
-** *施加真实世界的力------荷载与约束条件*
+本章的任务是将重力坝在现实世界中所受到的物理荷载与支撑条件, 转化为平台能够理解和处理的具体~Kernel~(核)和~BC~(边界条件)对象. 这是验证平台物理建模能力的关键一步.
 
-本章的任务是将重力坝在现实世界中所受到的物理荷载与支撑条件, 转化为MOOSE能够理解和处理的具体Kernel(核)和BC(边界条件)对象.
+*** *~~块: 固定地基*
 
-*** *``块: 固定地基*
-
-为了防止模型在计算过程中发生刚体平动或转动, 我们必须对模型的地基施加位移约束. 在我们的模型中, 这意味着将地基的底边界完全固定. 这通过DirichletBC(狄利克雷边界条件)对象来实现.
+为了防止模型在计算过程中发生刚体平动或转动, 我们必须对模型的地基施加位移约束. 在我们的模型中, 这通过将地基的底边界完全固定来实现. 这通过~DirichletBC~(狄利克雷边界条件)对象来实现, 是对平台处理基本约束能力的一项验证.
 
 #+begin_example
-
+[]
   # 固定地基底部的x方向位移
   [./fix_base_x]
     type = DirichletBC
@@ -330,19 +284,17 @@ ID, 并调用为该block指定的材料模型来获取所需的物理参数(如�
     boundary = 'base_boundary'
     value = 0.0
   [../]
-
+[]
 #+end_example
 
-- [./fix_base_x] 和 [./fix_base_y]:
-  两个DirichletBC对象, 分别约束x和y方向的位移.
-- variable: 指定该边界条件作用于哪个未知量(disp_x或disp_y).
-- boundary = 'base_boundary':
-  将约束施加到我们在Gmsh中命名的base_boundary边集上. MOOSE会自动识别这个名称并找到对应的所有节点.
-- value = 0.0: 将这些节点上对应变量的值强制设为0.
+- ~[./fix_base_x]~ 和 ~[./fix_base_y]~: 两个~DirichletBC~对象, 分别约束x和y方向的位移.
+- ~variable~: 指定该边界条件作用于哪个未知量(~disp_x~ 或 ~disp_y~).
+- ~boundary = 'base_boundary'~: 将约束施加到我们在Gmsh中命名的~base_boundary~边集上. 平台会自动识别这个名称并找到对应的所有节点.
+- ~value = 0.0~: 将这些节点上对应变量的值强制设为0.
 
 *** *[Kernels]块: 施加重力荷载*
 
-在MOOSE中, 像重力这样的体力(Body Force)是通过Kernel(核)对象来施加的. Kernel代表了有限元弱形式积分方程中的体积积分项. 我们将使用Gravity核来模拟自重效应.
+在我们的平台中, 像重力这样的体力(Body Force)是通过~Kernel~(核)对象来施加的. ~Kernel~代表了有限元弱形式积分方程中的体积积分项. 我们使用~Gravity~核来模拟自重效应.
 
 #+begin_example
 [Kernels]
@@ -353,81 +305,77 @@ ID, 并调用为该block指定的材料模型来获取所需的物理参数(如�
     density = density
     block = 'dam_body foundation_body'
   [../]
-
+[]
 #+end_example
 
-- type = Gravity: 指定使用重力核.
-- variable = disp_y:
-  重力在垂直方向(y轴负方向)上起作用, 因此该核贡献于disp_y变量的控制方程.
-- value = -9.81: 重力加速度常数(单位: m/s²).
-- block = 'dam_body foundation_body':
-  将重力荷载施加到大坝和地基这两个区域.
-- density = density:
-  这是一个展示MOOSE内部耦合机制的绝佳例子. Gravity核本身并不知道材料的密度, 它需要这个信息来计算体力(力 = 密度 × 重力加速度). 该参数告诉Gravity核: " 在每个积分点上, 去材料系统中查询一个名为' density'的属性值".
-  由于我们在[Materials]块中已经为dam_body和foundation_body分别定义了不同的density值, 材料系统将智能地为不同区域的单元返回相应的密度值(混凝土为2400, 岩石为2700).
+- ~type = Gravity~: 指定使用重力核.
+- ~variable = disp_y~: 重力在垂直方向(y轴负方向)上起作用, 因此该核贡献于~disp_y~变量的控制方程.
+- ~value = -9.81~: 重力加速度常数(单位: m/s²).
+- ~block = 'dam_body foundation_body'~: 将重力荷载施加到大坝和地基这两个区域.
+- ~density = density~: 这是一个展示平台内部耦合机制的绝佳验证点. ~Gravity~ 核本身并不知道材料的密度, 它需要这个信息来计算体力(力 = 密度 × 重力加速度). 该参数告诉 ~Gravity~ 核: " 在每个积分点上, 去材料系统中查询一个名为'density'的属性值" . 由于我们在 ~[Materials]~ 块中已经为 ~dam_body~ 和 ~foundation_body~ 分别定义了不同的 ~density~ 值, 平台的材料系统能够智能地为不同区域的单元返回相应的密度值(混凝土为2400, 岩石为2700).
 
-这种Kernel与Material系统之间的解耦与协作, 是MOOSE模块化设计的核心体现. 它允许开发者编写通用的物理Kernel, 而这些Kernel可以与各种复杂的, 用户自定义的材料模型协同工作, 极大地增强了框架的灵活性和可扩展性.
+这种 ~Kernel~ 与 ~Material~ 系统之间的解耦与协作, 是平台模块化设计的核心体现, 本次验证成功证明了该机制的正确性.
 
 *** *模拟水库荷载: 静水压力*
 
-静水压力是重力坝的主要荷载之一, 其特点是压力值随水深线性增加. 我们将组合使用Pressure边界条件和ParsedFunction函数对象来精确模拟这一分布荷载.
+静水压力是重力坝的主要荷载之一, 其特点是压力值随水深线性增加. 为了验证平台处理复杂分布荷载的能力, 我们组合使用 ~Pressure~ 边界条件和 ~ParsedFunction~ 函数对象来精确模拟这一分布荷载.
 
-1. 在``块中定义压力边界条件:
-   Pressure边界条件用于施加一个垂直于作用面的压力.
+1. 在~~块中定义压力边界条件:
+   ~Pressure~ 边界条件用于施加一个垂直于作用面的压力.
 
    #+begin_example
+   []
      ...
       [./hydrostatic_pressure]
         type = Pressure
         boundary = 'upstream_face'
         function = hydrostatic_pressure_func
       [../]
-
+   []
    #+end_example
 
-   - type = Pressure: 指定使用压力边界条件.
-   - boundary = 'upstream_face': 将压力施加到我们之前命名的上游坝面上.
-   - function = hydrostatic_pressure_func:
-     这是关键. 我们将压力的具体数值大小与一个名为hydrostatic_pressure_func的MOOSE函数对象关联起来.
+   - ~type = Pressure~: 指定使用压力边界条件.
+   - ~boundary = 'upstream_face'~: 将压力施加到我们之前命名的上游坝面上.
+   - ~function = hydrostatic_pressure_func~: 这是关键. 我们将压力的具体数值大小与一个名为 ~hydrostatic_pressure_func~ 的平台函数对象关联起来.
 
-2. 在[Functions]块中定义压力函数:
-   ParsedFunction允许用户直接在输入文件中通过数学表达式来定义一个函数.
+2. 在 ~[Functions]~ 块中定义压力函数:
+   ~ParsedFunction~ 允许用户直接在输入文件中通过数学表达式来定义一个函数.
 
    #+begin_example
-     [Functions]
-       [./hydrostatic_pressure_func]
-         type = ParsedFunction
-         expression = 'max(0, rho_water * g * (water_level - y))'
-         symbol_names = 'rho_water g water_level'
-         symbol_values = '1000 9.81 90'
-       [../]
+   [Functions]
+     [./hydrostatic_pressure_func]
+       type = ParsedFunction
+       expression = 'max(0, rho_water * g * (water_level - y))'
+       symbol_names = 'rho_water g water_level'
+       symbol_values = '1000 9.81 90'
+     [../]
+   []
    #+end_example
 
-   - type = ParsedFunction: 指定函数类型.
-   - expression: 这是函数的数学表达式. y是MOOSE在计算时自动提供的空间坐标. 表达式rho_water ​* g * (water_level - y)精确描述了静水压力公式 p=ρgh. max(0,...)确保在水面以上(即y > water_level)的区域, 压力为零, 而不是负值.
-   - symbol_names 和 symbol_values:
-     这两个参数成对工作. symbol_names声明了表达式中使用的自定义符号(rho_water, g, water_level), 而symbol_values则为这些符号赋予了具体的数值(水的密度1000 kg/m³, 重力加速度9.81 m/s², 以及假设的水位高度90 m).
+   - ~type = ParsedFunction~: 指定函数类型.
+   - ~expression~: 这是函数的数学表达式. ~y~是平台在计算时自动提供的空间坐标. 表达式 ~rho_water * g * (water_level - y)~ 精确描述了静水压力公式 p=ρgh. ~max(0,...)~ 确保在水面以上(即y > water_level)的区域, 压力为零, 而不是负值.
+   - ~symbol_names~ 和 ~symbol_values~: 这两个参数成对工作. ~symbol_names~声明了表达式中使用的自定义符号(~rho_water~, ~g~, ~water_level~), 而~symbol_values~则为这些符号赋予了具体的数值(水的密度1000 kg/m³, 重力加速度9.81 m/s², 以及假设的水位高度90 m).
 
-下表清晰地拆解了ParsedFunction的配置, 这对于理解如何定义复杂的, 空间依赖的荷载非常有帮助.
+下表清晰地拆解了 ~ParsedFunction~ 的配置, 这对于理解平台如何定义复杂的, 空间依赖的荷载非常有帮助.
 
 *表 5.1: ParsedFunction用于定义静水压力的参数详解*
 
-| 参数          | 值                                          | 描述                                                               |
-|---------------+---------------------------------------------+--------------------------------------------------------------------|
-| type          | ParsedFunction                              | 指定该对象类型, 允许使用数学表达式定义函数.                        |
-| expression    | 'max(0, rho_water * g * (water_level - y))' | 定义了静水压力的物理规律. y是由MOOSE提供的, 每个计算点上的y坐标.   |
-| symbol_names  | 'rho_water g water_level'                   | 一个以空格分隔的字符串, 列出了表达式中使用的所有自定义符号.        |
-| symbol_values | '1000 9.81 90'                              | 一个以空格分隔的字符串, 按顺序为symbol_names中声明的符号提供数值.  |
+| 参数          | 值                                          | 描述                                                                |
+|---------------+---------------------------------------------+---------------------------------------------------------------------|
+| type          | ParsedFunction                              | 指定该对象类型, 允许使用数学表达式定义函数.                         |
+| expression    | 'max(0, rho_water * g * (water_level - y))' | 定义了静水压力的物理规律. ~y~ 是由平台提供的, 每个计算点上的y坐标.    |
+| symbol_names  | 'rho_water g water_level'                   | 一个以空格分隔的字符串, 列出了表达式中使用的所有自定义符号.         |
+| symbol_values | '1000 9.81 90'                              | 一个以空格分隔的字符串, 按顺序为 ~symbol_names~ 中声明的符号提供数值. |
 
-通过这种方式, 我们成功地将一个随空间位置变化的复杂荷载, 以一种清晰, 参数化的方式施加到了模型上.
+通过这种方式, 我们成功地将一个随空间位置变化的复杂荷载, 以一种清晰, 参数化的方式施加到了模型上, 验证了平台相应的功能.
 
-** *执行, 监控与数据提取*
+** *数值求解与数据后处理验证*
 
-涵盖仿真的数值求解设置, 结果文件的输出配置, 以及如何从仿真结果中提取关键的, 定量的工程指标.
+本章涵盖仿真的数值求解设置, 结果文件的输出配置, 以及如何从仿真结果中提取关键的, 定量的工程指标, 从而对平台的求解器和后处理功能进行验证.
 
 *** *[Executioner]块: 配置求解器*
 
-Executioner(执行器)是MOOSE中负责控制整个求解流程的核心对象. 对于一个静态或准静态问题, 我们通常使用Transient(瞬态)执行器, 并将其配置为只求解一个时间步, 从而得到最终的静态平衡解.
+~Executioner~ (执行器)是平台中负责控制整个求解流程的核心对象. 对于一个静态或准静态问题, 我们通常使用 ~Transient~ (瞬态)执行器, 并将其配置为只求解一个时间步, 从而得到最终的静态平衡解.
 
 #+begin_example
 [Executioner]
@@ -435,29 +383,32 @@ Executioner(执行器)是MOOSE中负责控制整个求解流程的核心对象. 
   solve_type = NEWTON
   end_time = 1
   dt = 1
+[]
 #+end_example
 
-- type = Transient: 指定使用瞬态执行器.
-- solve_type = NEWTON: 选择强大的NEWTON(牛顿-拉夫逊)方法来求解非线性方程组. 对于结构力学问题, 即使是线弹性, 由于几何或边界条件的复杂性, 也通常作为非线性问题来求解.
-- end_time = 1, dt = 1: 设置求解的结束" 时间" 为1, 时间步长也为1. 这使得执行器恰好执行一次求解迭代, 得到在荷载作用下的静态解.
+- ~type = Transient~: 指定使用瞬态执行器.
+- ~solve_type = NEWTON~: 选择强大的~NEWTON~(牛顿-拉夫逊)方法来求解非线性方程组. 对于结构力学问题, 即使是线弹性, 由于几何或边界条件的复杂性, 也通常作为非线性问题来求解.
+- ~end_time = 1~, ~dt = 1~: 设置求解的结束" 时间" 为1, 时间步长也为1. 这使得执行器恰好执行一次求解迭代, 得到在荷载作用下的静态解.
 
 *** *[Outputs]块: 保存仿真结果*
 
-[Outputs]块负责将计算得到的结果数据写入文件, 以供后续的可视化和分析.
+~[Outputs]~ 块负责将计算得到的结果数据写入文件, 以供后续的可视化和分析.
 
 #+begin_example
 [Outputs]
   exodus = true
+  csv = true
+[]
 #+end_example
 
-- exodus = true:
-  这是一个便捷的开关, 用于启用ExodusII格式的输出. ExodusII是与可视化软件ParaView无缝兼容的标准格式, 它能保存网格信息, 场变量(如位移, 应力)以及后处理器的值.
-- MOOSE同样支持将后处理器数据输出为CSV格式, 这对于使用Matplotlib, Excel等工具进行绘图或数据分析非常方便. 只需添加csv = true即可启用.
+- ~exodus = true~: 启用ExodusII格式的输出. ExodusII是与可视化软件ParaView无缝兼容的标准格式, 它能保存网格信息, 场变量(如位移, 应力)以及后处理器的值.
+- ~csv = true~: 平台同样支持将后处理器数据输出为CSV格式, 这对于使用Matplotlib, Excel等工具进行绘图或数据分析非常方便, 便于自动化验证.
 
 *** *[Postprocessors]块: 提取关键性能指标*
 
-Postprocessor(后处理器)是一类特殊的对象, 它们可以在仿真过程中或结束后, 根据求解得到的场变量计算出单一的标量值, 例如某个点的位移, 某条边界上的平均应力, 或整个区域内的最大值等. 这对于进行工程校核和性能评估至关重要.
-以下是如何定义后处理器来提取重力坝分析中的一些关键指标:
+~Postprocessor~ (后处理器)是一类特殊的对象, 它们可以在仿真过程中或结束后, 根据求解得到的场变量计算出单一的标量值, 例如某个点的位移, 某条边界上的平均应力, 或整个区域内的最大值等. 这对于进行工程校核和自动化验证至关重要.
+
+以下是如何定义后处理器来提取重力坝分析中的一些关键指标, 以验证平台的数据提取能力:
 
 #+begin_example
 [Postprocessors]
@@ -468,57 +419,52 @@ Postprocessor(后处理器)是一类特殊的对象, 它们可以在仿真过程
     node = <crest_node_id> # 需要预先知道坝顶中心点的节点ID
   [../]
 
-  # 提取坝踵（高压侧坝底）的最大主应力（通常是压应力）
+  # 提取坝踵(高压侧坝底)的最大主应力(通常是压应力)
   [./heel_stress_yy]
     type = ElementExtremeValue
     variable = stress_yy
-    value_type = min  # 寻找最小值，即最大压应力
+    value_type = min  # 寻找最小值, 即最大压应力
     block = 'dam_body'
   [../]
 
-  # 提取坝趾（低压侧坝底）的最大主应力（通常是拉应力）
+  # 提取坝趾(低压侧坝底)的最大主应力(通常是拉应力)
   [./toe_stress_yy]
     type = ElementExtremeValue
     variable = stress_yy
-    value_type = max  # 寻找最大值，即最大拉应力
+    value_type = max  # 寻找最大值, 即最大拉应力
     block = 'dam_body'
   [../]
-
+[]
 #+end_example
 
-- [./crest_disp_x]:
-  使用NodalValue来获取特定节点上的变量值. 这需要用户预先从网格文件中确定坝顶中心点的节点ID.
-- [./heel_stress_yy] 和 [./toe_stress_yy]:
-  使用ElementExtremeValue来搜索一个变量在指定区域内的最大或最小值. 这对于快速找到最大压应力(value_type
-  = min)和最大拉应力(value_type = max)非常有用.
+- ~[./crest_disp_x]~: 使用~NodalValue~来获取特定节点上的变量值. 这需要用户预先从网格文件中确定坝顶中心点的节点ID.
+- ~[./heel_stress_yy]~ 和 ~[./toe_stress_yy]~: 使用~ElementExtremeValue~来搜索一个变量在指定区域内的最大或最小值. 这对于快速找到最大压应力(~value_type = min~)和最大拉应力(~value_type = max~)非常有用.
 
-下表总结了一些在重力坝分析中常见的工程关注点, 以及如何用MOOSE后处理器来实现它们. 这展示了如何将具体的工程问题转化为MOOSE的特定对象, 从而实现自动化, 定量的结果分析.
+下表总结了一些在重力坝分析中常见的工程关注点, 以及如何用平台后处理器来实现它们. 这展示了如何将具体的工程问题转化为平台的特定对象, 从而实现自动化, 定量的结果分析.
 
 *表 6.1: 重力坝分析中的关键后处理器配置*
 
-| 工程关注点           | MOOSE后处理器类型   | variable  | boundary/block           | 备注                                         |
+| 工程关注点           | 平台后处理器类型    | variable  | boundary/block           | 备注                                         |
 |----------------------+---------------------+-----------+--------------------------+----------------------------------------------|
-| 坝顶最大水平位移     | NodalMaxValue       | disp_x    | crest_boundary           | 需在Gmsh中为坝顶定义一个边集crest_boundary.  |
-| 坝顶最大竖向沉降     | NodalMaxValue       | disp_y    | crest_boundary           | value_type默认为max, 对于沉降应取min.        |
-| 坝踵最大压应力       | ElementExtremeValue | stress_yy | dam_body                 | 设置value_type = min.                        |
-| 坝趾最大拉应力       | ElementExtremeValue | stress_yy | dam_body                 | 设置value_type = max.                        |
+| 坝顶最大水平位移     | NodalMaxValue       | disp_x    | crest_boundary           | 需在Gmsh中为坝顶定义一个边集 ~crest_boundary~. |
+| 坝顶最大竖向沉降     | NodalMaxValue       | disp_y    | crest_boundary           | ~value_type~ 默认为max, 对于沉降应取 ~min~.      |
+| 坝踵最大压应力       | ElementExtremeValue | stress_yy | dam_body                 | 设置 ~value_type = min~.                       |
+| 坝趾最大拉应力       | ElementExtremeValue | stress_yy | dam_body                 | 设置 ~value_type = max~.                       |
 | 作用于坝基的总竖向力 | SideIntegral        | stress_yy | dam_foundation_interface | 可用于校核倾覆稳定性.                        |
 
-配置好以上各块后, 我们就可以在dam_app目录下, 通过以下命令执行仿真:
+配置好以上各块后, 我们就可以在~dam_app~目录下, 通过以下命令执行仿真:
 
-Bash
+./dam_app-opt -i dam_gravity_validate.i
 
-./dam_app-opt -i your_input_file.i
+仿真完成后, 将生成一个.e格式的结果文件和.csv格式的后处理数据, 等待我们进行最后的分析和解读.
 
-仿真完成后, 将生成一个.e格式的结果文件, 等待我们进行最后的分析和解读.
+** *结果可视化与分析*
 
-** *结果解读------使用ParaView进行可视化*
+原始的数值数据是抽象的, 只有通过有效的可视化, 我们才能直观地理解结构的力学行为, 并验证计算结果的合理性. 本章将指导您如何使用强大的开源科学可视化软件ParaView, 将平台生成的.e文件转化为富有洞察力的工程图表.
 
-原始的数值数据是抽象的, 只有通过有效的可视化, 我们才能直观地理解结构的力学行为. 本章将指导您如何使用强大的开源科学可视化软件ParaView, 将MOOSE生成的.e文件转化为富有洞察力的工程图表.
+*** *结果可视化流程*
 
-*** *ParaView与MOOSE的协同工作*
-
-ParaView是科学计算领域广泛使用的可视化工具, 它能够处理大规模, 多维度的数据集. MOOSE选择ExodusII作为其主要的输出格式, 正是因为它与ParaView有着天然的, 紧密的集成. 用户无需任何转换, 即可直接在ParaView中打开MOOSE的输出文件进行分析.
+ParaView是科学计算领域广泛使用的可视化工具, 它能够处理大规模, 多维度的数据集. 我们的平台选择ExodusII作为其主要的输出格式, 正是因为它与ParaView有着天然的, 紧密的集成. 用户无需任何转换, 即可直接在ParaView中打开平台的输出文件进行分析.
 
 *** *加载并探索仿真数据*
 
@@ -530,224 +476,224 @@ ParaView是科学计算领域广泛使用的可视化工具, 它能够处理大�
    - *Main View*: 中心区域, 用于显示三维渲染或二维图表.
    - *Toolbar*: 顶部工具栏, 提供了选择变量, 控制动画时间步等快捷操作.
 
-*** *7.3 创建富有洞察力的可视化图像*
+*** *创建关键结果云图与变形图*
 
-通过组合使用ParaView的各种滤镜, 我们可以从不同维度揭示大坝的力学响应.
+通过组合使用ParaView的各种滤镜, 我们可以从不同维度揭示大坝的力学响应, 以验证结果的正确性.
 
 - *位移云图*:
-  1. 在顶部的变量选择下拉菜单中, 选择disp_x或disp_y, 主视图将显示相应方向的位移分布云图.
-  2. 为了得到总位移云图, 我们需要使用Calculator滤镜. 选中数据源, 点击菜单Filters -> Alphabetical -> Calculator.
-  3. 在Properties面板中, 设置Result Array Name为disp_mag, 并在表达式框中输入 sqrt(disp_x^2 + disp_y^2).
-  4. 点击Apply后, 即可在变量下拉菜单中选择disp_mag来显示总位移云图.
-- 应力云图: 直接从变量下拉菜单中选择von_mises_stress可以查看等效应力分布, 这对于评估材料是否屈服非常关键. 同样, 选择stress_yy可以直观地看到大坝内部的竖向压应力和拉应力分布, 帮助我们定位坝踵的压应力集中和坝趾的潜在拉应力区域.
-- 变形图(Deformed Shape):
+  1. 在顶部的变量选择下拉菜单中, 选择~disp_x~或~disp_y~, 主视图将显示相应方向的位移分布云图.
+  2. 为了得到总位移云图, 我们使用Calculator滤镜. 选中数据源, 点击菜单Filters -> Alphabetical -> Calculator.
+  3. 在Properties面板中, 设置Result Array Name为~disp_mag~, 并在表达式框中输入 ~sqrt(disp_x^2 + disp_y^2)~.
+  4. 点击Apply后, 即可在变量下拉菜单中选择~disp_mag~来显示总位移云图.
+- *应力云图*: 直接从变量下拉菜单中选择~von_mises_stress~可以查看等效应力分布, 这对于评估材料是否屈服非常关键. 同样, 选择~stress_yy~可以直观地看到大坝内部的竖向压应力和拉应力分布, 帮助我们定位坝踵的压应力集中和坝趾的潜在拉应力区域, 这些分布应符合经典力学预期.
+- *变形图(Deformed Shape)*:
   这是结构分析中最重要的可视化之一, 它能直观地展示结构在荷载作用下的变形形态.
   1. 选中数据源, 点击菜单Filters -> Alphabetical -> Warp By Vector.
   2. 在Properties面板中, ParaView通常会自动选择位移向量(如果变量名规范). 确保Vectors下拉菜单选中了包含位移分量的项.
   3. 调整Scale Factor. 这是一个放大系数, 因为真实位移通常非常小, 肉眼难以察觉. 通过设置一个较大的Scale Factor(如100或1000), 我们可以得到一个夸张但直观的变形后形状.
-  4. 点击Apply. 您将看到大坝在自重和水压力作用下向下游倾斜和弯曲的夸张变形图, 这对于理解其整体受力行为非常有帮助.
+  4. 点击Apply. 您将看到大坝在自重和水压力作用下向下游倾斜和弯曲的夸张变形图, 这对于理解其整体受力行为, 验证模型约束和荷载施加是否正确非常有帮助.
 
-通过综合分析位移云图, 应力云图和变形图, 工程师和研究人员可以全面评估重力坝的设计是否安全, 合理, 并为进一步的优化设计提供数据支持.
+通过综合分析位移云图, 应力云图和变形图, 可以全面评估仿真结果的合理性, 从而验证我们自研平台在解决此类问题上的准确性和可靠性.
 
 ** *总结*
 
 *** *成果总结*
 
-详尽地演示了使用MOOSE框架进行混凝土重力坝结构分析的全过程. 我们遵循了一个完整的工程仿真工作流, 涵盖了以下核心环节和关键概念:
+本报告通过一个典型的混凝土重力坝结构分析案例, 系统性地验证了我们自主研发的有限元平台的核心功能. 我们遵循了完整的工程仿真工作流, 成功验证了以下核心模块与关键技术:
 
-- *环境搭建*: 成功配置了MOOSE的开发与仿真环境, 并强调了创建独立, 可维护的专属应用程序(DamApp)的重要性.
-- *网格划分*: 使用Gmsh创建了非规则的几何模型, 并通过Physical Groups建立了从几何实体到物理定义的稳固, 语义化的链接, 这是确保复杂模型可维护性的关键实践.
-- *输入文件构建*: 掌握了MOOSE的HIT输入文件格式, 并依次配置了[Mesh], [Variables]等基础块.
-- *物理建模*: 深入探索了TensorMechanics模块, 利用其高层次的QuasiStatic动作极大地简化了静力学问题的定义. 通过" 块限制" 机制, 成功地为大坝和地基赋予了不同的材料属性, 展示了MOOSE处理非均质材料系统的能力.
-- *荷载与约束*: 精确地施加了各类荷载与边界条件, 包括使用DirichletBC固定地基, 利用Gravity核施加自重, 以及组合Pressure边界条件和ParsedFunction来模拟随水深变化的静水压力. 在此过程中, 揭示了Kernel, BC与Material系统之间优雅的" 即插即用" 协作关系.
-- *求解与数据提取*: 配置了Executioner进行求解, 并通过Outputs块生成了可供分析的Exodus结果文件. 此外, 还演示了如何使用Postprocessors来提取如坝顶位移, 关键部位应力等具体的工程性能指标.
-- *结果可视化*: 利用ParaView对仿真结果进行了多角度的可视化分析, 包括位移云图, 应力云图以及至关重要的结构变形图.
+- *平台架构*: 验证了平台" 框架-应用" 分离的软件架构, 证明了其开发模式的独立性和可维护性.
+- *网格接口与物理定义*: 验证了平台与主流网格划分软件Gmsh的无缝接口, 特别是通过" 物理组" 实现几何与物理定义稳固链接的机制.
+- *输入系统*: 验证了平台基于HIT格式的输入系统的解析能力与易用性.
+- *固体力学求解核心*: 验证了 ~TensorMechanics~ 模块的核心功能, 包括使用高层 ~Action~ 系统简化问题定义, 以及通过" 块限制" 机制精确处理非均质材料的能力.
+- *荷载与边界条件*: 成功验证了平台施加各类典型荷载与边界条件的能力, 包括狄利克雷边界条件, 重力(体力), 以及由函数定义的复杂分布荷载(静水压力). 特别验证了 ~Kernel~, ~BC~ 与 ~Material~ 系统之间" 即插即用" 的耦合机制.
+- *求解与后处理*: 验证了平台的非线性求解器与数据输出模块. 同时, 通过~Postprocessor~功能, 验证了平台在仿真中自动提取关键工程指标(如特定点位移, 区域极值应力)的能力.
+- *结果验证*: 通过使用ParaView对输出结果进行可视化分析, 仿真结果(位移, 应力分布, 变形形态)符合结构力学基本规律, 初步证实了计算的准确性.
 
 *** *未来高级分析的展望*
 
-本报告所建立的模型是一个坚实的基础. MOOSE框架的真正威力在于其无与伦比的可扩展性和多物理场耦合能力. 基于当前的工作, 可以向以下更高级, 更贴近实际工程需求的方向拓展:
+本次验证工作为一个坚实的基础. 我们自研平台的真正潜力在于其卓越的可扩展性和多物理场耦合能力. 基于当前的工作, 可以向以下更高级, 更贴近实际工程需求的方向拓展:
 
 - *非线性材料行为*:
-  当前模型假设混凝土为线弹性材料. 在实际工程中, 混凝土在受拉时会开裂, 其力学行为是高度非线性的. 我们可以轻易地将[Materials]块中的ComputeIsotropicElasticityTensor替换为MOOSE中已有的混凝土损伤模型, 如MazarsDamage, 从而模拟大坝在极限荷载下的开裂过程和损伤演化.
-- *热-力耦合分析*: 大体积混凝土在浇筑和水化过程中会释放大量热量, 形成显著的温度场, 进而产生热应力. 通过耦合MOOSE的HeatConduction(热传导)模块, 可以模拟这一过程, 分析温度效应对大坝应力状态的影响. 同样, 也可以分析环境温度周期性变化引起的温度应力.
-- *动力与抗震分析*: 重力坝的抗震性能是设计的重中之重. MOOSE的TensorMechanics模块提供了动态分析的能力. 通过将QuasiStatic动作替换为DynamicMaster动作 并施加随时间变化的地震动加速度记录作为边界条件或体力, 就可以对大壩进行时程动力分析, 评估其在地震作用下的响应.
+  当前模型假设混凝土为线弹性材料. 在实际工程中, 混凝土在受拉时会开裂, 其力学行为是高度非线性的. 我们可以轻易地将 ~[Materials]~ 块中的 ~ComputeIsotropicElasticityTensor~ 替换为平台中已有的混凝土损伤模型, 如 ~MazarsDamage~, 从而模拟大坝在极限荷载下的开裂过程和损伤演化.
+- *热-力耦合分析*: 大体积混凝土在浇筑和水化过程中会释放大量热量, 形成显著的温度场, 进而产生热应力. 通过耦合平台的热传导模块, 可以模拟这一过程, 分析温度效应对大坝应力状态的影响. 同样, 也可以分析环境温度周期性变化引起的温度应力.
+- *动力与抗震分析*: 重力坝的抗震性能是设计的重中之重. 平台的~TensorMechanics~模块提供了动态分析的能力. 通过将 ~QuasiStatic~ 动作替换为 ~DynamicMaster~ 动作, 并施加随时间变化的地震动加速度记录作为边界条件或体力, 就可以对大壩进行时程动力分析, 评估其在地震作用下的响应.
 
-MOOSE框架不仅能够胜任本报告中演示的基础静力分析, 更提供了一个通往高级, 复杂, 多物理场耦合分析的广阔平台, 为解决前沿的科学与工程问题提供了强大的计算工具.
+我们的平台不仅能够胜任本报告中验证的基础静力分析, 更提供了一个通往高级, 复杂, 多物理场耦合分析的广阔平台, 为解决前沿的科学与工程问题提供了强大的自主可控的计算工具.
 
 ** *附录: 完整注释的输入文件*
 
-以下是本报告所描述的重力坝二维平面应变分析的完整MOOSE输入文件(.i文件). 文件中包含了详尽的注释, 对每个块和关键参数的作用进行了说明, 并交叉引用了报告中进行详细解释的章节.
+以下是本报告所描述的重力坝二维平面应变分析的完整平台输入文件(.i文件). 文件中包含了详尽的注释, 对每个块和关键参数的作用进行了说明, 并交叉引用了报告中进行详细解释的章节.
 
 #+begin_example
-  # ===================================================================
-  # MOOSE 输入文件: 混凝土重力坝二维平面应变分析
-  # 本文件旨在作为报告的综合参考。
-  # ===================================================================
+# ===================================================================
+# 自研有限元平台 输入文件: 混凝土重力坝二维平面应变分析验证案例
+# 本文件旨在作为报告的综合参考.
+# ===================================================================
 
-  # -------------------------------------------------------------------
-  # 第3章: 导入在Gmsh中创建的网格模型
-  # -------------------------------------------------------------------
-  [Mesh]
-    type = FileMeshGenerator
-    # 指定由Gmsh生成的网格文件路径。
-    # MOOSE将自动读取文件中定义的物理组（Physical Groups）。
-    file = 'dam_mesh.msh'
+# -------------------------------------------------------------------
+# 第3章: 导入在Gmsh中创建的网格模型
+# -------------------------------------------------------------------
+[Mesh]
+  type = FileMeshGenerator
+  # 指定由Gmsh生成的网格文件路径.
+  # 平台将自动读取文件中定义的物理组(Physical Groups).
+  file = 'dam_mesh.msh'
+[]
 
+# -------------------------------------------------------------------
+# 第4章: 定义物理场和材料属性
+# 使用高层次的Action系统来简化固体力学问题的设置
+# -------------------------------------------------------------------
+[Physics]
+  []
+    [./all]
+      # 声明为小应变分析 (SMALL) 或有限应变 (FINITE)
+      strain = SMALL
+      # 让Action系统自动创建位移变量(disp_x, disp_y)
+      add_variables = true
+      # 指定需要额外计算并输出到结果文件的物理量
+      generate_output = 'stress_xx stress_yy strain_xx von_mises_stress'
 
-  # -------------------------------------------------------------------
-  # 第4章: 定义物理场和材料属性
-  # 使用高层次的Action系统来简化固体力学问题的设置
-  # -------------------------------------------------------------------
-  [Physics]
-
-
-        # 声明为小应变分析 (SMALL) 或有限应变 (FINITE)
-        strain = SMALL
-        # 让Action系统自动创建位移变量(disp_x, disp_y)
-        add_variables = true
-        # 指定需要额外计算并输出到结果文件的物理量
-        generate_output = 'stress_xx stress_yy strain_xx von_mises_stress'
-
-        # 在Action内部定义子块，用于后续的材料块限制
-        [./dam]
-          block = 'dam_body'
-        [../]
-        [./foundation]
-          block = 'foundation_body'
-        [../]
+      # 在Action内部定义子块, 用于后续的材料块限制
+      [./dam]
+        block = 'dam_body'
+      [../]
+      [./foundation]
+        block = 'foundation_body'
       [../]
     [../]
+  []
+[]
 
+[Materials]
+  # --- 混凝土材料属性 ---
+  # 定义混凝土的线弹性本构关系
+  [./concrete_elasticity]
+    type = ComputeIsotropicElasticityTensor
+    youngs_modulus = 30e9  # 杨氏模量 (Pa)
+    poissons_ratio = 0.2   # 泊松比
+    # 关键: 将此材料属性限制于名为'dam_body'的网格块
+    block = 'dam_body'
+  [../]
+  # 定义混凝土的密度, 用于计算重力
+  [./concrete_density]
+    type = GenericConstantMaterial
+    prop_names = 'density'
+    prop_values = '2400'   # 密度 (kg/m^3)
+    block = 'dam_body'
+  [../]
 
-  [Materials]
-    # --- 混凝土材料属性 ---
-    # 定义混凝土的线弹性本构关系
-    [./concrete_elasticity]
-      type = ComputeIsotropicElasticityTensor
-      youngs_modulus = 30e9  # 杨氏模量 (Pa)
-      poissons_ratio = 0.2   # 泊松比
-      # 关键：将此材料属性限制于名为'dam_body'的网格块
-      block = 'dam_body'
-    [../]
-    # 定义混凝土的密度，用于计算重力
-    [./concrete_density]
-      type = GenericConstantMaterial
-      prop_names = 'density'
-      prop_values = '2400'   # 密度 (kg/m^3)
-      block = 'dam_body'
-    [../]
+  # --- 地基岩石材料属性 ---
+  # 定义地基岩石的线弹性本构关系
+  [./foundation_elasticity]
+    type = ComputeIsotropicElasticityTensor
+    youngs_modulus = 50e9  # 杨氏模量 (Pa)
+    poissons_ratio = 0.25  # 泊松比
+    block = 'foundation_body'
+  [../]
+  # 定义地基岩石的密度
+  [./foundation_density]
+    type = GenericConstantMaterial
+    prop_names = 'density'
+    prop_values = '2700'   # 密度 (kg/m^3)
+    block = 'foundation_body'
+  [../]
+[]
 
-    # --- 地基岩石材料属性 ---
-    # 定义地基岩石的线弹性本构关系
-    [./foundation_elasticity]
-      type = ComputeIsotropicElasticityTensor
-      youngs_modulus = 50e9  # 杨氏模量 (Pa)
-      poissons_ratio = 0.25  # 泊松比
-      block = 'foundation_body'
-    [../]
-    # 定义地基岩石的密度
-    [./foundation_density]
-      type = GenericConstantMaterial
-      prop_names = 'density'
-      prop_values = '2700'   # 密度 (kg/m^3)
-      block = 'foundation_body'
-    [../]
+# -------------------------------------------------------------------
+# 第5章: 施加荷载与约束
+# -------------------------------------------------------------------
+[Kernels]
+  # 施加重力荷载 (体力)
+  [./gravity_y]
+    type = Gravity
+    # 重力作用于y方向的平衡方程
+    variable = disp_y
+    # 重力加速度
+    value = -9.81
+    # 关键: 告知Gravity核从平台的材料系统中获取名为'density'的属性
+    # 平台会根据单元所在的block自动匹配正确的密度值
+    density = density
+    # 将重力施加到大坝和地基两个区域
+    block = 'dam_body foundation_body'
+  [../]
+[]
 
+[]
+  # --- 约束条件 ---
+  # 固定地基底部的x方向位移
+  [./fix_base_x]
+    type = DirichletBC
+    variable = disp_x
+    boundary = 'base_boundary'
+    value = 0.0
+  [../]
+  # 固定地基底部的y方向位移
+  [./fix_base_y]
+    type = DirichletBC
+    variable = disp_y
+    boundary = 'base_boundary'
+    value = 0.0
+  [../]
 
-  # -------------------------------------------------------------------
-  # 第5章: 施加荷载与约束
-  # -------------------------------------------------------------------
-  [Kernels]
-    # 施加重力荷载 (体力)
-    [./gravity_y]
-      type = Gravity
-      # 重力作用于y方向的平衡方程
-      variable = disp_y
-      # 重力加速度
-      value = -9.81
-      # 关键：告知Gravity核从材料系统中获取名为'density'的属性
-      # MOOSE会根据单元所在的block自动匹配正确的密度值
-      density = density
-      # 将重力施加到大坝和地基两个区域
-      block = 'dam_body foundation_body'
-    [../]
+  # --- 荷载条件 ---
+  # 施加随水深变化的静水压力
+  [./hydrostatic_pressure]
+    type = Pressure
+    # 作用于名为'upstream_face'的边界
+    boundary = 'upstream_face'
+    # 压力的数值由下面的[Functions]块中的函数定义
+    function = hydrostatic_pressure_func
+  [../]
+[]
 
+[Functions]
+  # 定义静水压力函数 p = rho * g * h
+  [./hydrostatic_pressure_func]
+    type = ParsedFunction
+    # 表达式: max(0,...) 确保水面以上压力为0
+    # y 是平台提供的空间坐标
+    expression = 'max(0, rho_water * g * (water_level - y))'
+    # 声明表达式中使用的符号
+    symbol_names = 'rho_water g water_level'
+    # 为符号提供具体数值
+    symbol_values = '1000 9.81 90' # 水密度, g, 水位高度(m)
+  [../]
+[]
 
+# -------------------------------------------------------------------
+# 第6章: 配置求解器与输出
+# -------------------------------------------------------------------
+[Executioner]
+  type = Transient
+  # 使用牛顿法求解非线性系统
+  solve_type = NEWTON
+  # 对于静态问题, 设置一个时间步即可
+  end_time = 1
+  dt = 1
+[]
 
-    # --- 约束条件 ---
-    # 固定地基底部的x方向位移
-    [./fix_base_x]
-      type = DirichletBC
-      variable = disp_x
-      boundary = 'base_boundary'
-      value = 0.0
-    [../]
-    # 固定地基底部的y方向位移
-    [./fix_base_y]
-      type = DirichletBC
-      variable = disp_y
-      boundary = 'base_boundary'
-      value = 0.0
-    [../]
+[Outputs]
+  # 启用ExodusII格式输出, 用于ParaView可视化
+  exodus = true
+  # (可选) 启用CSV格式输出, 用于记录后处理器的值
+  csv = true
+[]
 
-    # --- 荷载条件 ---
-    # 施加随水深变化的静水压力
-    [./hydrostatic_pressure]
-      type = Pressure
-      # 作用于名为'upstream_face'的边界
-      boundary = 'upstream_face'
-      # 压力的数值由下面的[Functions]块中的函数定义
-      function = hydrostatic_pressure_func
-    [../]
+[Postprocessors]
+  # 提取坝顶的最大水平位移 (需在Gmsh中为坝顶定义 'crest_boundary')
+  [./crest_disp_x_max]
+    type = NodalMaxValue
+    variable = disp_x
+    boundary = 'crest_boundary'
+  [../]
 
-
-  [Functions]
-    # 定义静水压力函数 p = rho * g * h
-    [./hydrostatic_pressure_func]
-      type = ParsedFunction
-      # 表达式：max(0,...) 确保水面以上压力为0
-      # y 是MOOSE提供的空间坐标
-      expression = 'max(0, rho_water * g * (water_level - y))'
-      # 声明表达式中使用的符号
-      symbol_names = 'rho_water g water_level'
-      # 为符号提供具体数值
-      symbol_values = '1000 9.81 90' # 水密度, g, 水位高度(m)
-    [../]
-
-
-  # -------------------------------------------------------------------
-  # 第6章: 配置求解器与输出
-  # -------------------------------------------------------------------
-  [Executioner]
-    type = Transient
-    # 使用牛顿法求解非线性系统
-    solve_type = NEWTON
-    # 对于静态问题，设置一个时间步即可
-    end_time = 1
-    dt = 1
-
-
-  [Outputs]
-    # 启用ExodusII格式输出，用于ParaView可视化
-    exodus = true
-    # (可选) 启用CSV格式输出，用于记录后处理器的值
-    csv = true
-
-
-  [Postprocessors]
-    # 提取坝顶的最大水平位移 (需在Gmsh中为坝顶定义 'crest_boundary')
-    [./crest_disp_x_max]
-      type = NodalMaxValue
-      variable = disp_x
-      boundary = 'crest_boundary'
-    [../]
-
-    # 提取坝踵区域的最小(即最大压缩)竖向应力
-    [./heel_stress_yy_min]
-      type = ElementExtremeValue
-      variable = stress_yy
-      value_type = min
-      block = 'dam_body'
-    [../]
-
+  # 提取坝踵区域的最小(即最大压缩)竖向应力
+  [./heel_stress_yy_min]
+    type = ElementExtremeValue
+    variable = stress_yy
+    value_type = min
+    block = 'dam_body'
+  [../]
+[]
 #+end_example
