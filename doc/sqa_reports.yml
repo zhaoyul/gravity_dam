@@ -1,0 +1,6 @@
+Applications:
+    gravity_dam:
+        app_types:
+            - gravity_damApp
+        content_directory: ${ROOT_DIR}/doc/content
+        log_default: WARNING
