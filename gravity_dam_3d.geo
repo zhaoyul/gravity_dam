@@ -57,6 +57,7 @@ Physical Surface("crest_boundary", 204) = {crest_sur[1]};
 // --------------------- 网格控制 & 生成 ---------------------
 Mesh.ElementOrder = 1;              // 一阶单元即可
 Mesh.Algorithm = 5;                 // 网格划分算法（Frontal-Delaunay）
+Mesh.MshFileVersion = 2.2;          // 使用 MSH v2 以便与 MOOSE 兼容
 
 // 生成网格
-Mesh 2;
+Mesh 3;                             // 生成三维单元

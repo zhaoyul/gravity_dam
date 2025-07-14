@@ -28,6 +28,11 @@ The simulation calculates the following key outputs:
 
 This model serves as a fundamental example for structural analysis in civil engineering and provides a foundation for more advanced simulations, such as those involving material nonlinearity, seismic loads, or fluid-structure interaction.
 
+An additional three-dimensional example is available in `input_3d.i`, which uses
+the extruded mesh `gravity_dam_3d.msh`. This model follows the same physics as
+the 2D case but includes a displacement component in the out-of-plane
+direction.
+
 ---
 
 ## 项目目标与验证说明
