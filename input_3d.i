@@ -4,6 +4,7 @@
 ########################################################################
 
 [Mesh]
+  construct_side_list_from_node_list = true
   [gmsh_mesh]
     type = FileMeshGenerator
     file = 'gravity_dam_3d.msh'
@@ -102,26 +103,26 @@
   [./fix_base_x]
     type = DirichletBC
     variable = disp_x
-    boundary = 'base_boundary'
+    boundary = 201
     value = 0
   [../]
   [./fix_base_y]
     type = DirichletBC
     variable = disp_y
-    boundary = 'base_boundary'
+    boundary = 201
     value = 0
   [../]
   [./fix_base_z]
     type = DirichletBC
     variable = disp_z
-    boundary = 'base_boundary'
+    boundary = 201
     value = 0
   [../]
 
   [./hydrostatic_pressure]
     type = Pressure
     variable = disp_x
-    boundary = 'upstream_face'
+    boundary = 202
     function = hydrostatic_pressure_func
     displacements = 'disp_x disp_y disp_z'
   [../]
@@ -154,7 +155,7 @@
   [./crest_disp_x_max]
     type = NodalExtremeValue
     variable = disp_x
-    boundary = 'crest_boundary'
+    boundary = 204
     value_type = max
   [../]
 []
