@@ -45,6 +45,9 @@ Physical Line("crest_boundary", 204) = {4};                   // 坝顶
 // --------------------- 网格控制 & 生成 ---------------------
 Mesh.ElementOrder = 1;              // 一阶单元即可
 Mesh.Algorithm = 5;                 // 网格划分算法（Frontal-Delaunay）
+Mesh.RecombineAll = 1;              // 尝试在所有面上生成四边形
+Recombine Surface {20};             // 将坝体区域划分为四边形网格
+Recombine Surface {21};             // 将地基区域划分为四边形网格
 
 // 生成网格
 Mesh 2;
