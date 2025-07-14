@@ -39,6 +39,15 @@
 []
 
 # ---------------------------------------------------------------------
+# 额外定义求解温度场的变量
+# ---------------------------------------------------------------------
+[Variables]
+  [./temp]
+    initial_condition = 20
+  [../]
+[]
+
+# ---------------------------------------------------------------------
 # 1. Materials - 只需定义核心本构关系和密度
 # ---------------------------------------------------------------------
 [Materials]
@@ -55,8 +64,8 @@
   [../]
   [./dam_rho]
     type = GenericConstantMaterial
-    prop_names = 'density'
-    prop_values = '2400'
+    prop_names = 'density thermal_conductivity specific_heat'
+    prop_values = '2400 2.5 900'
     block = 'dam_body'
   [../]
 
@@ -73,8 +82,8 @@
   [../]
   [./fdn_rho]
     type = GenericConstantMaterial
-    prop_names = 'density'
-    prop_values = '2700'
+    prop_names = 'density thermal_conductivity specific_heat'
+    prop_values = '2700 2.0 850'
     block = 'foundation_body'
   [../]
 []
@@ -91,6 +100,12 @@
     displacements = 'disp_x disp_y'
     value = -9.81
     density = density
+    block = 'dam_body foundation_body'
+  [../]
+
+  [./heat_conduction]
+    type = HeatConduction
+    variable = temp
     block = 'dam_body foundation_body'
   [../]
 []
@@ -118,6 +133,19 @@
     boundary = 'upstream_face'
     function = hydrostatic_pressure_func
     displacements = 'disp_x disp_y'
+  [../]
+
+  [./temp_upstream]
+    type = DirichletBC
+    variable = temp
+    boundary = 'upstream_face'
+    value = 10
+  [../]
+  [./temp_other]
+    type = DirichletBC
+    variable = temp
+    boundary = 'base_boundary crest_boundary downstream_face'
+    value = 20
   [../]
 []
 
