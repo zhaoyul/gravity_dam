@@ -12,6 +12,7 @@ This simulation performs a 2D plane strain analysis of a gravity dam subjected t
 ### Model Details
 
 *   **Geometry**: The model consists of two main bodies: the dam body and the foundation.
+*   **Mesh**: The 2D domain is discretized with quadrilateral elements generated in Gmsh.
 *   **Materials**: Both the dam and the foundation are modeled as linear elastic, isotropic materials with distinct properties.
 *   **Loads**:
     *   **Gravity**: Applied to the entire model to simulate self-weight.
