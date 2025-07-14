@@ -41,6 +41,7 @@ Physical Line("base_boundary", 201) = {7};                    // 地基底边
 Physical Line("upstream_face", 202) = {5};                    // 上游水压
 Physical Line("dam_foundation_interface", 203) = {1};         // 接触面
 Physical Line("crest_boundary", 204) = {4};                   // 坝顶
+Physical Line("downstream_face", 205) = {2};                  // 下游坝面
 
 // --------------------- 网格控制 & 生成 ---------------------
 Mesh.ElementOrder = 1;              // 一阶单元即可
