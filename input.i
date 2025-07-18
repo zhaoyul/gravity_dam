@@ -6,7 +6,7 @@
 [Mesh]
   [gmsh_mesh]
     type = FileMeshGenerator
-    file = 'gravity_dam.msh'
+    file = 'gravity_dam_quad.msh'
   []
 []
 
