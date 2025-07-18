@@ -504,6 +504,122 @@ ParaView是科学计算领域广泛使用的可视化工具, 它能够处理大�
 
 通过综合分析位移云图, 应力云图和变形图, 可以全面评估仿真结果的合理性, 从而验证我们自研平台在解决此类问题上的准确性和可靠性.
 
+** *多物理场耦合验证: 热-力耦合*
+
+在验证了平台的固体力学分析能力之后, 我们将进一步展示其更为强大的多物理场耦合功能. 对于大体积混凝土结构, 温度变化是引起结构内部应力的一个关键因素, 不可忽视. 本章将以一个典型的热-力耦合问题为例, 验证平台在该领域的建模与求解能力.
+
+*** *工程背景与耦合机理*
+
+温度应力的来源主要有两方面:
+1.  *水化热*: 混凝土在凝固过程中会释放大量热量(水化热), 导致结构内部温度升高. 随后, 随着混凝土冷却, 会产生收缩, 若此收缩受到约束, 则会产生拉应力.
+2.  *环境温差*: 大坝上游面长期与较低温度的水体接触, 而下游面则暴露在大气中, 承受日照和气温的周期性变化. 这种温度梯度会在大坝内部引起不均匀的热胀冷缩, 从而产生热应力.
+
+我们平台的耦合机制允许温度场计算(热传导分析)和结构场计算(固体力学分析)同时进行. 其核心在于, 热分析得到的温度场 T(x,y) 会通过一个热膨胀材料模型, 转化为一个热应变场(ε_thermal = α * ΔT), 该热应变将作为一个额外的应变源项, 参与到总应力的计算中, 从而影响结构的位移和应力分布.
+
+*** *在平台中实现热-力耦合*
+
+实现热-力耦合的步骤清晰直观, 充分体现了我们平台"即插即用"的设计哲学.
+
+1. *定义温度变量*:
+   首先, 我们需要在 ~[Variables]~ 块中定义一个新的求解变量 ~temp~, 用于代表温度场.
+
+   #+begin_example
+   [Variables]
+     ...
+     [./temp]
+       initial_condition = 20 # 假设初始温度为20摄氏度
+     [../]
+   []
+   #+end_example
+
+2. *添加热传导物理*:
+   在 ~[Kernels]~ 块中, 我们加入一个 ~HeatConduction~ (热传导)核, 它负责求解稳态热传导方程.
+
+   #+begin_example
+   [Kernels]
+     ...
+     [./heat_conduction]
+       type = HeatConduction
+       variable = temp
+       block = 'dam_body foundation_body'
+     [../]
+   []
+   #+end_example
+
+3. *定义材料的热属性*:
+   为了进行热传导计算, 我们需要在 ~[Materials]~ 块中为混凝土和地基补充定义导热系数(thermal_conductivity)和比热(specific_heat, 尽管对于稳态问题非必需). 同时, 为了计算热应力, 必须提供热膨胀系数(thermal_expansion_coefficient).
+
+   #+begin_example
+   [Materials]
+     [./concrete_properties]
+       type = GenericConstantMaterial
+       prop_names = 'density thermal_conductivity thermal_expansion_coefficient'
+       prop_values = '2400 2.5 1e-5' # 密度, 导热系数, 热膨胀系数
+       block = 'dam_body'
+     [../]
+     # ... 为地基定义类似属性 ...
+   []
+   #+end_example
+
+4. *激活耦合: 添加热应变材料*
+   这是实现耦合的 *关键一步*. 我们需要添加一个 ~ComputeThermalExpansionEigenstrain~ 材料对象. 该对象会自动读取 ~temp~ 变量的值, 并根据指定的热膨胀系数计算出热应变. 平台的 ~TensorMechanics~ 模块会自动将这个热应变纳入总应变的计算中.
+
+   #+begin_example
+   [Materials]
+     ...
+     [./thermal_strain]
+       type = ComputeThermalExpansionEigenstrain
+       temperature = temp
+       thermal_expansion_coefficient = thermal_expansion_coefficient
+       stress_free_temperature = 20 # 定义一个无应力参考温度
+       block = 'dam_body foundation_body'
+     [../]
+   []
+   #+end_example
+
+5. *施加温度边界条件*:
+   最后, 在 ~~ 块中, 我们为温度场施加边界条件. 例如, 假设上游水温为10摄氏度, 其他边界(坝顶, 下游面)暴露于20摄氏度的空气中.
+
+   #+begin_example
+   []
+     ...
+     [./temp_upstream]
+       type = DirichletBC
+       variable = temp
+       boundary = 'upstream_face'
+       value = 10
+     [../]
+     [./temp_other]
+       type = DirichletBC
+       variable = temp
+       boundary = 'crest_boundary downstream_face'
+       value = 20
+     [../]
+   []
+   #+end_example
+
+完成以上步骤后, 再次运行仿真, 平台将同时求解位移场和温度场, 并考虑它们之间的相互作用.
+
+*** *耦合结果可视化*
+
+运行耦合分析后, 输出的.e文件中将同时包含位移, 应力和温度数据.
+
+- *温度分布云图*:
+  在ParaView中, 我们可以直接选择 ~temp~ 变量来可视化大坝内部的稳态温度分布. 能观察到从上游冷水面到下游暖空气面的平滑温度过渡.
+
+  温度分布云图:
+  [[file:imgs/temperature.png]]
+
+- *热应力分析*:
+  温度梯度引起的热应力将叠加在原有的自重和水压应力之上. 通过对比耦合分析与纯力学分析的应力结果(例如 ~stress_yy~), 可以清晰地评估温度效应带来的影响. 通常, 上游冷却区域会产生拉应力, 而内部较暖区域则会产生压应力.
+
+  由温度效应引起的应力增量或总应力云图:
+  [[file:imgs/stress_yy_by_temperature.png]]
+
+
+
+我们证明了自研平台不仅能处理单一物理场问题, 更具备了解决工程实际中常见的多物理场耦合问题的强大能力, 为进行更复杂, 更真实的工程模拟奠定了基础.
+
 ** *总结*
 
 *** *成果总结*
